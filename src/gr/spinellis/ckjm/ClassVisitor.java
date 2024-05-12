@@ -91,18 +91,15 @@ public class ClassVisitor extends org.apache.bcel.classfile.EmptyVisitor {
 	}
 	registerCoupling(super_name);
 
-	String ifs[] = jc.getInterfaceNames();
-	/* Measuring decision: couple interfaces */
-	for (int i = 0; i < ifs.length; i++)
-	    registerCoupling(ifs[i]);
+       String[] interfaces = jc.getInterfaceNames();
+        for (String iface : interfaces)
+            registerCoupling(iface);
 
-	Field[] fields = jc.getFields();
-	for(int i=0; i < fields.length; i++)
-	    fields[i].accept(this);
+        for (Field field : jc.getFields())
+            field.accept(this);
 
-	Method[] methods = jc.getMethods();
-	for(int i=0; i < methods.length; i++)
-	    methods[i].accept(this);
+        for (Method method : jc.getMethods())
+            method.accept(this);
     }
 
     /** Add a given class to the classes we are coupled to */
@@ -158,12 +155,11 @@ public class ClassVisitor extends org.apache.bcel.classfile.EmptyVisitor {
 	Type[] argTypes   = mg.getArgumentTypes();
 
 	registerCoupling(mg.getReturnType());
-	for (int i = 0; i < argTypes.length; i++)
-	    registerCoupling(argTypes[i]);
+        for (Type argType : argTypes)
+            registerCoupling(argType);
 
-	String[] exceptions = mg.getExceptions();
-	for (int i = 0; i < exceptions.length; i++)
-	    registerCoupling(exceptions[i]);
+        for (String exception : mg.getExceptions())
+            registerCoupling(exception);
 
 	/* Measuring decision: A class's own methods contribute to its RFC */
 	incRFC(myClassName, method.getName(), argTypes);
@@ -191,26 +187,26 @@ public class ClassVisitor extends org.apache.bcel.classfile.EmptyVisitor {
     }
 
     /** Do final accounting at the end of the visit. */
-    public void end() {
-	cm.setCbo(efferentCoupledClasses.size());
-	cm.setRfc(responseSet.size());
-	/*
-	 * Calculate LCOM  as |P| - |Q| if |P| - |Q| > 0 or 0 otherwise
-	 * where
-	 * P = set of all empty set intersections
-	 * Q = set of all nonempty set intersections
-	 */
-	int lcom = 0;
-	for (int i = 0; i < mi.size(); i++)
-	    for (int j = i + 1; j < mi.size(); j++) {
-		/* A shallow unknown-type copy is enough */
-		TreeSet<?> intersection = (TreeSet<?>)mi.get(i).clone();
-		intersection.retainAll(mi.get(j));
-		if (intersection.size() == 0)
-		    lcom++;
-		else
-		    lcom--;
-	    }
-	cm.setLcom(lcom > 0 ? lcom : 0);
+   public void end() {
+        cm.setCbo(efferentCoupledClasses.size());
+        cm.setRfc(responseSet.size());
+
+        int lcom = calculateLCOM();
+        cm.setLcom(lcom > 0 ? lcom : 0);
+    }
+
+    private int calculateLCOM() {
+        int lcom = 0;
+        for (int i = 0; i < mi.size(); i++) {
+            for (int j = i + 1; j < mi.size(); j++) {
+                TreeSet<String> intersection = new TreeSet<>(mi.get(i));
+                intersection.retainAll(mi.get(j));
+                if (intersection.isEmpty())
+                    lcom++;
+                else
+                    lcom--;
+            }
+        }
+        return lcom;
     }
 }

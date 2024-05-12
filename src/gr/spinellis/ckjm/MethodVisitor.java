@@ -16,10 +16,12 @@
 
 package gr.spinellis.ckjm;
 
-import org.apache.bcel.generic.*;
+//import org.apache.bcel.generic.*;
+//import org.apache.bcel.Constants;
+//import org.apache.bcel.util.*;
+//import java.util.*;
 import org.apache.bcel.Constants;
-import org.apache.bcel.util.*;
-import java.util.*;
+import org.apache.bcel.generic.*;
 
 /**
  * Visit a method calculating the class's Chidamber-Kemerer metrics.
@@ -31,34 +33,33 @@ import java.util.*;
  */
 class MethodVisitor extends EmptyVisitor {
     /** Method generation template. */
-    private MethodGen mg;
+    private final MethodGen mg;
     /* The class's constant pool. */
-    private ConstantPoolGen cp;
+    private final ConstantPoolGen cp;
     /** The visitor of the class the method visitor is in. */
-    private ClassVisitor cv;
+    private final ClassVisitor cv;
     /** The metrics of the class the method visitor is in. */
     private ClassMetrics cm;
 
     /** Constructor. */
-    MethodVisitor(MethodGen m, ClassVisitor c) {
-	mg  = m;
-	cv = c;
-	cp  = mg.getConstantPool();
-	cm = cv.getMetrics();
+    MethodVisitor(MethodGen methodGen, ClassVisitor classVisitor) {
+        this.mg = methodGen;
+        this.cv = classVisitor;
+        this.cp = mg.getConstantPool();
     }
 
     /** Start the method's visit. */
     public void start() {
-	if (!mg.isAbstract() && !mg.isNative()) {
-	    for (InstructionHandle ih = mg.getInstructionList().getStart();
-		 ih != null; ih = ih.getNext()) {
-		Instruction i = ih.getInstruction();
-
-		if(!visitInstruction(i))
-		    i.accept(this);
-	    }
-	    updateExceptionHandlers();
-	}
+        if (!mg.isAbstract() && !mg.isNative()) {
+            for (InstructionHandle instructionHandle = mg.getInstructionList().getStart();
+                 instructionHandle != null; instructionHandle = instructionHandle.getNext()) {
+                Instruction instruction = instructionHandle.getInstruction();
+                if (!visitInstruction(instruction)) {
+                    instruction.accept(this);
+                }
+            }
+            updateExceptionHandlers();
+        }
     }
 
     /** Visit a single instruction. */
@@ -90,8 +91,11 @@ class MethodVisitor extends EmptyVisitor {
     /** Method invocation. */
     public void visitInvokeInstruction(InvokeInstruction i) {
 	Type[] argTypes   = i.getArgumentTypes(cp);
-	for (int j = 0; j < argTypes.length; j++)
-	    cv.registerCoupling(argTypes[j]);
+        for (Type argType : argTypes) {
+            cv.registerCoupling(argType);
+        }
+//	for (int j = 0; j < argTypes.length; j++)
+//	    cv.registerCoupling(argTypes[j]);
 	cv.registerCoupling(i.getReturnType(cp));
 	/* Measuring decision: measure overloaded methods separately */
 	cv.registerMethodInvocation(i.getClassName(cp), i.getMethodName(cp), argTypes);

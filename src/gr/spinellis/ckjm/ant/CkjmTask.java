@@ -16,6 +16,7 @@
 
 package gr.spinellis.ckjm.ant;
 
+import gr.spinellis.ckjm.CkjmOutputHandler;
 import gr.spinellis.ckjm.MetricsFilter;
 import gr.spinellis.ckjm.PrintPlainResults;
 
@@ -111,7 +112,47 @@ public class CkjmTask extends MatchingTask {
         }
         return extdirs.createPath();
     }
+    
+    private void validateParameters() {
+        if (classDir == null) {
+            throw new BuildException("classDir attribute must be set!");
+        }
+        if (!classDir.exists()) {
+            throw new BuildException("classDir does not exist!");
+        }
+        if (!classDir.isDirectory()) {
+            throw new BuildException("classDir is not a directory!");
+        }
+    }
 
+    private void setJavaExtensionDirectories() {
+    if (extdirs != null && extdirs.size() > 0) {
+        String extDirsProperty = System.getProperty("java.ext.dirs");
+        if (extDirsProperty == null || extDirsProperty.isEmpty()) {
+            System.setProperty("java.ext.dirs", extdirs.toString());
+        } else {
+            System.setProperty("java.ext.dirs",
+                extDirsProperty + File.pathSeparator + extdirs.toString());
+        }
+    }
+}
+    
+    private String[] buildFilePaths(String[] files) {
+        String[] filePaths = new String[files.length];
+        for (int i = 0; i < files.length; i++) {
+            filePaths[i] = classDir.getPath() + File.separatorChar + files[i];
+        }
+        return filePaths;
+    }
+
+    private CkjmOutputHandler createOutputPrinter(OutputStream outputStream) {
+        if (format.equals("xml")) {
+            return new PrintXmlResults(new PrintStream(outputStream));
+        } else {
+            return new PrintPlainResults(new PrintStream(outputStream));
+        }
+    }
+    
     /**
      * Executes the CKJM Ant Task. This method redirects the output of the CKJM
      * tool to a file. When XML format is used it will buffer the output and
@@ -121,52 +162,24 @@ public class CkjmTask extends MatchingTask {
      *             if an error occurs.
      */
     public void execute() throws BuildException {
-        if (classDir == null) {
-            throw new BuildException("classdir attribute must be set!");
-        }
-        if (!classDir.exists()) {
-            throw new BuildException("classdir does not exist!");
-        }
-        if (!classDir.isDirectory()) {
-            throw new BuildException("classdir is not a directory!");
-        }
-
-	if (extdirs != null && extdirs.size() > 0) {
-	    if (System.getProperty("java.ext.dirs").length() == 0)
-		System.setProperty("java.ext.dirs", extdirs.toString());
-	    else
-		System.setProperty("java.ext.dirs",
-		    System.getProperty("java.ext.dirs") + File.pathSeparator +
-		    extdirs);
-	}
+        
+        validateParameters();
+        
+	setJavaExtensionDirectories();
 
         DirectoryScanner ds = super.getDirectoryScanner(classDir);
 
         String files[] = ds.getIncludedFiles();
+        
         if (files.length == 0) {
             log("No class files in specified directory " + classDir);
-        } else {
-            for (int i = 0; i < files.length; i++) {
-                files[i] = classDir.getPath() + File.separatorChar + files[i];
-            }
-
+        } 
+        else {
+            String[] filePaths = buildFilePaths(files);
             try {
-                OutputStream outputStream = new FileOutputStream(outputFile);
-
-                if (format.equals("xml")) {
-                    PrintXmlResults outputXml = new PrintXmlResults(
-                            new PrintStream(outputStream));
-
-                    outputXml.printHeader();
-                    MetricsFilter.runMetrics(files, outputXml);
-                    outputXml.printFooter();
-                } else {
-                    PrintPlainResults outputPlain = new PrintPlainResults(
-                            new PrintStream(outputStream));
-                    MetricsFilter.runMetrics(files, outputPlain);
-                }
-
-                outputStream.close();
+                OutputStream outputStream = new FileOutputStream(outputFile);                
+                CkjmOutputHandler outputPrinter = createOutputPrinter(outputStream);
+                MetricsFilter.runMetrics(filePaths, outputPrinter);
 
             } catch (IOException ioe) {
                 throw new BuildException("Error file handling: "

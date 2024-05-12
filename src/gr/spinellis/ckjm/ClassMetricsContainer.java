@@ -34,28 +34,26 @@ import java.io.*;
 class ClassMetricsContainer {
 
     /** The map from class names to the corresponding metrics */
-    private HashMap<String, ClassMetrics> m = new HashMap<String, ClassMetrics>();
+    private final Map<String, ClassMetrics> classMetricsMap = new HashMap<>();
 
     /** Return a class's metrics */
     public ClassMetrics getMetrics(String name) {
-	ClassMetrics cm = m.get(name);
+	ClassMetrics cm = classMetricsMap.get(name);
 	if (cm == null) {
 	    cm = new ClassMetrics();
-	    m.put(name, cm);
+	    classMetricsMap.put(name, cm);
 	}
 	return cm;
     }
 
     /** Print the metrics of all the visited classes. */
     public void printMetrics(CkjmOutputHandler handler) {
-	Set<Map.Entry<String, ClassMetrics>> entries = m.entrySet();
-	Iterator<Map.Entry<String, ClassMetrics>> i;
-
-	for (i = entries.iterator(); i.hasNext(); ) {
-	    Map.Entry<String, ClassMetrics> e = i.next();
-	    ClassMetrics cm = e.getValue();
-	    if (cm.isVisited() && (MetricsFilter.includeAll() || cm.isPublic()))
-		handler.handleClass(e.getKey(), cm);
-	}
+        for (Map.Entry<String, ClassMetrics> entry : classMetricsMap.entrySet()) {
+            String className = entry.getKey();
+            ClassMetrics classMetrics = entry.getValue();
+            if (classMetrics.isVisited() && (MetricsFilter.includeAll() || classMetrics.isPublic())) {
+                handler.handleClass(className, classMetrics);
+            }
+        }
     }
 }

@@ -49,30 +49,31 @@ public class MetricsFilter {
     /** Return true if the measurements should include all classes */
     public static boolean includeAll() { return !onlyPublic; }
 
+    private static JavaClass loadClass(String clspec) throws ClassFormatException {
+        try {
+            int spc = clspec.indexOf(' ');
+            if (spc != -1) {
+                String jar = clspec.substring(0, spc);
+                String clsFile = clspec.substring(spc + 1);
+                return new ClassParser(jar, clsFile).parse();
+            } else {
+                return new ClassParser(clspec).parse();
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading class: " + e.getMessage());
+            return null;
+        }
+    }
+    
     /**
      * Load and parse the specified class.
      * The class specification can be either a class file name, or
      * a jarfile, followed by space, followed by a class file name.
      */
     static void processClass(ClassMetricsContainer cm, String clspec) {
-	int spc;
-	JavaClass jc = null;
-
-	if ((spc = clspec.indexOf(' ')) != -1) {
-	    String jar = clspec.substring(0, spc);
-	    clspec = clspec.substring(spc + 1);
-	    try {
-		jc = new ClassParser(jar, clspec).parse();
-	    } catch (IOException e) {
-		System.err.println("Error loading " + clspec + " from " + jar + ": " + e);
-	    }
-	} else {
-	    try {
-		jc = new ClassParser(clspec).parse();
-	    } catch (IOException e) {
-		System.err.println("Error loading " + clspec + ": " + e);
-	    }
-	}
+              
+        JavaClass jc = loadClass(clspec);
+        
 	if (jc != null) {
 	    ClassVisitor visitor = new ClassVisitor(jc, cm);
 	    visitor.start();
@@ -95,6 +96,23 @@ public class MetricsFilter {
         cm.printMetrics(outputHandler);
     }
 
+    private static void runMetricsFromStandardInput() {
+        ClassMetricsContainer cm = new ClassMetricsContainer();
+        
+        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+        try {
+            String s;
+            while ((s = in.readLine()) != null)
+                processClass(cm, s);
+        } catch (IOException e) {
+            System.err.println("Error reading line: " + e);
+            System.exit(1);
+        }
+        
+        CkjmOutputHandler handler = new PrintPlainResults(System.out);
+        cm.printMetrics(handler);
+    }
+    
     /** The filter's main body.
      * Process command line arguments and the standard input.
      */
@@ -109,24 +127,13 @@ public class MetricsFilter {
 	    onlyPublic = true;
 	    argp++;
 	}
-	ClassMetricsContainer cm = new ClassMetricsContainer();
-
-	if (argv.length == argp) {
-	    BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-	    try {
-		String s;
-		while ((s = in.readLine()) != null)
-		    processClass(cm, s);
-	    } catch (Exception e) {
-		System.err.println("Error reading line: " + e);
-		System.exit(1);
-	    }
-	}
-
-	for (int i = argp; i < argv.length; i++)
-	    processClass(cm, argv[i]);
-
-	CkjmOutputHandler handler = new PrintPlainResults(System.out);
-	cm.printMetrics(handler);
+        if (argv.length == argp) {
+            runMetricsFromStandardInput();
+        } 
+        else {
+            String[] files = Arrays.copyOfRange(argv, argp, argv.length);
+            runMetrics(files, new PrintPlainResults(System.out));
+        }
     }
+
 }
